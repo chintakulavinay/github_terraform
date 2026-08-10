@@ -1,0 +1,56 @@
+name: Terraform Deployment
+
+on:
+  push:
+    branches:
+      - dev
+      - qa
+      - main
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Select Environment
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "dev" ]; then
+            echo "TFVARS=tfvars/dev.tfvars" >> $GITHUB_ENV
+          elif [ "${GITHUB_REF_NAME}" = "qa" ]; then
+            echo "TFVARS=tfvars/qa.tfvars" >> $GITHUB_ENV
+          else
+            echo "TFVARS=tfvars/prod.tfvars" >> $GITHUB_ENV
+          fi
+
+      - name: Terraform Init
+        run: |
+          terraform init -reconfigure \
+            -backend-config="bucket=githubactions-897826" \
+            -backend-config="key=${GITHUB_REF_NAME}/terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=terraform-locks"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -var-file="$TFVARS" -out=tfplan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
