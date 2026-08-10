@@ -41,17 +41,20 @@ jobs:
         run: |
           if [ "${GITHUB_REF_NAME}" = "dev" ]; then
             echo "TFVARS=tfvars/dev.tfvars" >> $GITHUB_ENV
+            echo "STATE_KEY=dev/terraform.tfstate" >> $GITHUB_ENV
           elif [ "${GITHUB_REF_NAME}" = "qa" ]; then
             echo "TFVARS=tfvars/qa.tfvars" >> $GITHUB_ENV
+            echo "STATE_KEY=qa/terraform.tfstate" >> $GITHUB_ENV
           else
             echo "TFVARS=tfvars/prod.tfvars" >> $GITHUB_ENV
+            echo "STATE_KEY=prod/terraform.tfstate" >> $GITHUB_ENV
           fi
 
       - name: Terraform Init
         run: |
           terraform init -reconfigure \
             -backend-config="bucket=githubactions-897826" \
-            -backend-config="key=${GITHUB_REF_NAME}/terraform.tfstate" \
+            -backend-config="key=${STATE_KEY}" \
             -backend-config="region=us-east-1" \
             -backend-config="dynamodb_table=terraform-locks"
 
